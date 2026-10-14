@@ -1,0 +1,26 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+/node_modules/
+/.agents/
+/catalogo/
+*catalogo*
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Configuración local y credenciales
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+secrets.properties
+
+# Artefactos Android
+*.apk
+*.aab

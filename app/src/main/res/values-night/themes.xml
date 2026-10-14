@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme with NoActionBar for Compose -->
+    <style name="Theme.Cortinas" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your theme here. -->
+    </style>
+</resources>
