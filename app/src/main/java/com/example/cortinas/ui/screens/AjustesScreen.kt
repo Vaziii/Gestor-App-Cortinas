@@ -7,7 +7,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,11 +27,7 @@ fun AjustesScreen(
 ) {
     val config = repository.config
     AjustesContent(
-        initialNombreNegocio = config.nombreNegocio,
-        initialTelefonoNegocio = config.telefonoNegocio,
         isAuthenticated = config.isAuthenticated,
-        onGuardarNombre = { config.nombreNegocio = it },
-        onGuardarTelefono = { config.telefonoNegocio = it },
         onSignOut = onSignOut,
         modifier = modifier
     )
@@ -41,16 +36,10 @@ fun AjustesScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AjustesContent(
-    initialNombreNegocio: String = "Cortinas & Estilo",
-    initialTelefonoNegocio: String = "3001234567",
     isAuthenticated: Boolean = true,
-    onGuardarNombre: (String) -> Unit = {},
-    onGuardarTelefono: (String) -> Unit = {},
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var nombreNegocio by remember { mutableStateOf(initialNombreNegocio) }
-    var telefonoNegocio by remember { mutableStateOf(initialTelefonoNegocio) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -113,65 +102,6 @@ fun AjustesContent(
                     }
                 }
 
-                // ── Datos del negocio ──────────────────────────────────────
-                item {
-                    ElevatedCard(
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    shape = MaterialTheme.shapes.small,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Storefront,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(8.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    "Datos del negocio",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            OutlinedTextField(
-                                value = nombreNegocio,
-                                onValueChange = {
-                                    nombreNegocio = it
-                                    onGuardarNombre(it)
-                                },
-                                label = { Text("Nombre del negocio") },
-                                placeholder = { Text("Ej.: Cortinas y Persianas") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium,
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = telefonoNegocio,
-                                onValueChange = {
-                                    telefonoNegocio = it
-                                    onGuardarTelefono(it)
-                                },
-                                label = { Text("Teléfono de contacto") },
-                                placeholder = { Text("Ej.: 0991234567") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium,
-                                singleLine = true
-                            )
-                        }
-                    }
-                }
-
                 // ── Sincronización automática en la nube ───────────────────
                 item {
                     ElevatedCard(
@@ -204,7 +134,7 @@ fun AjustesContent(
                                 )
                             }
                             Text(
-                                "La sincronización se realiza automáticamente y en tiempo real con Supabase. Los datos se gestionan directamente en la nube y no se almacenan copias locales.",
+                                "La sincronización se realiza automáticamente y en tiempo real en la nube. Los datos no se almacenan como copias locales.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

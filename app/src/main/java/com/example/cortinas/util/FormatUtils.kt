@@ -6,7 +6,7 @@ import java.util.Date
 import java.util.Locale
 
 object FormatUtils {
-    private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "CO")).apply {
+    private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("es", "EC")).apply {
         maximumFractionDigits = 0
     }
 

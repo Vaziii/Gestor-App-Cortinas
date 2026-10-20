@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.PendingActions
@@ -29,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.cortinas.data.model.AbonoPago
 import com.example.cortinas.data.model.Cotizacion
 import com.example.cortinas.data.model.CotizacionItem
@@ -36,7 +39,9 @@ import com.example.cortinas.data.model.EstadoCotizacion
 import com.example.cortinas.data.repository.CortinasRepository
 import com.example.cortinas.ui.components.AdaptivePageFrame
 import com.example.cortinas.ui.theme.CortinasTheme
+import com.example.cortinas.ui.theme.WhatsAppGreen
 import com.example.cortinas.util.FormatUtils
+import com.example.cortinas.util.InvoicePdfUtils
 import com.example.cortinas.util.ShareUtils
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -72,8 +77,15 @@ fun VentasScreen(
                 Toast.makeText(context, "Registro eliminado", Toast.LENGTH_SHORT).show()
             }
         },
-        onCompartirWhatsApp = { cot ->
-            ShareUtils.shareViaWhatsApp(context, cot, repository.config.nombreNegocio)
+        onCompartirFactura = { cot, nombre, identificacion ->
+            try {
+                InvoicePdfUtils.share(context, cot, nombre, identificacion)
+            } catch (e: Exception) {
+                Toast.makeText(context, e.localizedMessage ?: "No se pudo crear la factura", Toast.LENGTH_LONG).show()
+            }
+        },
+        onEnviarProveedor = { cotizacion, tradicionales ->
+            ShareUtils.shareSupplierQuoteViaWhatsApp(context, cotizacion, tradicionales, repository.config.nombreNegocio)
         },
         modifier = modifier
     )
@@ -86,7 +98,8 @@ fun VentasContent(
     onRegistrarAbono: (AbonoPago) -> Unit = {},
     onCambiarEstado: (String, EstadoCotizacion) -> Unit = { _, _ -> },
     onEliminarCotizacion: (String) -> Unit = {},
-    onCompartirWhatsApp: (Cotizacion) -> Unit = {},
+    onCompartirFactura: (Cotizacion, String, String) -> Unit = { _, _, _ -> },
+    onEnviarProveedor: (Cotizacion, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -94,7 +107,8 @@ fun VentasContent(
     val tabTitles = listOf("Pendientes de Abono", "Todas las Ventas", "Completamente Pagadas", "Cotizaciones")
 
     var selectedCotizacionForAbono by remember { mutableStateOf<Cotizacion?>(null) }
-    var expandedCotizacionId by remember { mutableStateOf<String?>(null) }
+    var selectedCotizacionForInvoice by remember { mutableStateOf<Cotizacion?>(null) }
+    var selectedCotizacionForDetail by remember { mutableStateOf<Cotizacion?>(null) }
 
     // Métricas del Dashboard
     val totalVendido = remember(cotizaciones) {
@@ -370,15 +384,90 @@ fun VentasContent(
                         items(filteredCotizaciones, key = { it.id }) { cotizacion ->
                             VentaItemCard(
                                 cotizacion = cotizacion,
-                                isExpanded = expandedCotizacionId == cotizacion.id,
-                                onToggleExpand = {
-                                    expandedCotizacionId = if (expandedCotizacionId == cotizacion.id) null else cotizacion.id
-                                },
+                                isExpanded = false,
+                                onToggleExpand = { selectedCotizacionForDetail = cotizacion },
                                 onOpenAbono = { selectedCotizacionForAbono = cotizacion },
                                 onCambiarEstado = { nuevoEstado -> onCambiarEstado(cotizacion.id, nuevoEstado) },
-                                onCompartir = { onCompartirWhatsApp(cotizacion) },
+                                onCompartir = { selectedCotizacionForInvoice = cotizacion },
                                 onEliminar = { onEliminarCotizacion(cotizacion.id) }
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedCotizacionForDetail?.let { cotizacion ->
+        Dialog(
+            onDismissRequest = { selectedCotizacionForDetail = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { selectedCotizacionForDetail = null }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        }
+                        Text("Detalle de cotización", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                    ) {
+                        item {
+                            VentaItemCard(
+                                cotizacion = cotizacion,
+                                isExpanded = true,
+                                onToggleExpand = { selectedCotizacionForDetail = null },
+                                onOpenAbono = { selectedCotizacionForAbono = cotizacion },
+                                onCambiarEstado = { nuevoEstado -> onCambiarEstado(cotizacion.id, nuevoEstado) },
+                                onCompartir = { selectedCotizacionForInvoice = cotizacion },
+                                onEliminar = {
+                                    onEliminarCotizacion(cotizacion.id)
+                                    selectedCotizacionForDetail = null
+                                }
+                            )
+                        }
+                        item {
+                            val tieneMecanicas = cotizacion.items.any { it.telaTipo != "Cortina tradicional" }
+                            val tieneTradicionales = cotizacion.items.any { it.telaTipo == "Cortina tradicional" }
+                            if (tieneMecanicas || tieneTradicionales) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    if (tieneMecanicas) {
+                                        Button(
+                                            onClick = { onEnviarProveedor(cotizacion, false) },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Enviar mecánicas", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    if (tieneTradicionales) {
+                                        Button(
+                                            onClick = { onEnviarProveedor(cotizacion, true) },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Enviar tradicionales", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -397,6 +486,50 @@ fun VentasContent(
             }
         )
     }
+    selectedCotizacionForInvoice?.let { cotizacion ->
+        InvoiceShareDialog(
+            cotizacion = cotizacion,
+            onDismiss = { selectedCotizacionForInvoice = null },
+            onShare = { nombre, identificacion ->
+                onCompartirFactura(cotizacion, nombre, identificacion)
+                selectedCotizacionForInvoice = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun InvoiceShareDialog(cotizacion: Cotizacion, onDismiss: () -> Unit, onShare: (String, String) -> Unit) {
+    var nombre by remember(cotizacion.id) { mutableStateOf(cotizacion.clienteNombre) }
+    var identificacion by remember(cotizacion.id) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Compartir factura") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Revisa o completa los datos del cliente para esta factura. Los datos de la cotización se mantienen sin cambios.", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text("Nombre / Razón Social") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = identificacion,
+                    onValueChange = { identificacion = it },
+                    label = { Text("RUC / Cédula (opcional)") },
+                    placeholder = { Text("Agregar identificación") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Se compartirá como PDF de venta. La integración y autorización del SRI se añadirá en una etapa posterior.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { Button(onClick = { onShare(nombre.trim(), identificacion.trim()) }, enabled = nombre.isNotBlank()) { Text("Compartir PDF") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
 }
 
 /**
@@ -419,7 +552,7 @@ fun VentaItemCard(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize()
-            .clickable { onToggleExpand() }
+            .then(if (isExpanded) Modifier else Modifier.clickable { onToggleExpand() })
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             // Encabezado de la venta
@@ -461,12 +594,6 @@ fun VentaItemCard(
                         )
                     }
                 }
-
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -534,6 +661,21 @@ fun VentaItemCard(
                 }
             }
 
+            if (cotizacion.estado != EstadoCotizacion.COTIZACION) {
+                Spacer(modifier = Modifier.height(12.dp))
+                FilledTonalButton(
+                    onClick = onCompartir,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Icon(Icons.Outlined.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Compartir factura PDF", fontWeight = FontWeight.Bold)
+                }
+            }
+
             // CONTENIDO EXPANDIBLE ANIMADO
             if (isExpanded) {
                 HorizontalDivider(
@@ -568,7 +710,9 @@ fun VentaItemCard(
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
-                                    val detalleMedidas = if (item.esDosCuerpos) {
+                                    val detalleMedidas = if (item.telaTipo == "Cortina tradicional") {
+                                        "${FormatUtils.formatNumber(item.ancho)}m x ${FormatUtils.formatNumber(item.alto)}m"
+                                    } else if (item.esDosCuerpos) {
                                         "${FormatUtils.formatNumber(item.ancho)}m (2 Cuerpos: ${FormatUtils.formatNumber(item.anchoCuerpoIzq)}m + ${FormatUtils.formatNumber(item.anchoCuerpoDer)}m) × ${FormatUtils.formatNumber(item.alto)}m"
                                     } else {
                                         "${FormatUtils.formatNumber(item.ancho)}m × ${FormatUtils.formatNumber(item.alto)}m"
@@ -661,19 +805,6 @@ fun VentaItemCard(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Registrar Abono", fontWeight = FontWeight.Bold)
                         }
-                    }
-
-                    FilledTonalIconButton(
-                        onClick = onCompartir,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "Enviar solicitud al distribuidor por WhatsApp",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
                     }
 
                     FilledTonalIconButton(

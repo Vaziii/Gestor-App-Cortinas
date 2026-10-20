@@ -152,12 +152,6 @@ class SupabaseConfig(context: Context) {
         _sessionInvalidated.value = true
     }
 
-    var nombreNegocio: String
-        get() = prefs.getString("nombre_negocio", "Mi Taller de Cortinas") ?: "Mi Taller de Cortinas"
-        set(value) = prefs.edit().putString("nombre_negocio", value.trim()).apply()
-
-    var telefonoNegocio: String
-        get() = prefs.getString("telefono_negocio", "") ?: ""
-        set(value) = prefs.edit().putString("telefono_negocio", value.trim()).apply()
+    val nombreNegocio: String = "DECOR NAYELI CORTINAS Y LENCERIA"
 
 }

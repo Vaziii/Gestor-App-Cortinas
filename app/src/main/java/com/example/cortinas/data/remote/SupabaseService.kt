@@ -49,20 +49,20 @@ class SupabaseService(private val config: SupabaseConfig) {
                         .firstNotNullOfOrNull { key ->
                             runCatching { errorBody?.get(key)?.takeUnless { it.isJsonNull }?.asString }.getOrNull()
                         }
-                        ?: "Supabase rechazó el acceso (HTTP ${response.code}). Verifica el correo, la contraseña y la confirmación del usuario."
+                        ?: "No se pudo iniciar sesión (código ${response.code}). Verifica el correo y la contraseña."
                     return@withContext false to message
                 }
                 val session = gson.fromJson(content, JsonObject::class.java)
                 val access = session.get("access_token")?.asString.orEmpty()
                 val refresh = session.get("refresh_token")?.asString.orEmpty()
                 val expires = session.get("expires_in")?.asLong ?: 3600L
-                if (access.isBlank() || refresh.isBlank()) return@withContext false to "Supabase no devolvió una sesión válida."
+                if (access.isBlank() || refresh.isBlank()) return@withContext false to "No se pudo iniciar una sesión válida."
                 config.saveSession(access, refresh, expires)
                 config.recordLogin(rememberSession)
                 true to "Sesión iniciada."
             }
         } catch (e: Exception) {
-            false to (e.localizedMessage ?: "No se pudo conectar con Supabase.")
+            false to "No se pudo conectar. Revisa tu conexión a internet."
         }
     }
 
@@ -108,7 +108,7 @@ class SupabaseService(private val config: SupabaseConfig) {
     }
 
     suspend fun downloadSnapshot(): Pair<CloudSnapshot?, String?> = withContext(Dispatchers.IO) {
-        if (!refreshTokenIfNeeded()) return@withContext null to "Inicia sesión para conectar con la base de datos."
+        if (!refreshTokenIfNeeded()) return@withContext null to "Inicia sesión para consultar la información."
         val telasRows = fetchRows("telas")
         if (telasRows.first == null) return@withContext null to telasRows.second
         val clientesRows = fetchRows("clientes")
@@ -194,7 +194,7 @@ class SupabaseService(private val config: SupabaseConfig) {
                     if (!response.isSuccessful) {
                         if (response.code == 401) config.clearSession()
                         if (response.code == 403) config.markAuthorizationDenied()
-                        null to "No se pudieron descargar $table (${response.code}): $body"
+                        null to "No se pudo cargar la información. Revisa tu conexión e inténtalo de nuevo."
                     } else {
                         JsonParser.parseString(body).asJsonArray.map { it.asJsonObject } to null
                     }
@@ -206,7 +206,7 @@ class SupabaseService(private val config: SupabaseConfig) {
                 lastId = currentPage.last().text("id")
                 if (lastId.isNullOrBlank()) return null to "La respuesta de $table no contiene IDs para paginar."
             } catch (e: Exception) {
-                return null to (e.localizedMessage ?: "Error de red al leer $table")
+                return null to "Error de conexión al consultar la información."
             }
         }
     }
@@ -259,7 +259,7 @@ class SupabaseService(private val config: SupabaseConfig) {
     }
 
     suspend fun syncTelas(telas: List<Tela>): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        if (!refreshTokenIfNeeded()) return@withContext false to "Inicia sesión para sincronizar con Supabase."
+        if (!refreshTokenIfNeeded()) return@withContext false to "Inicia sesión para guardar los cambios."
         if (telas.isEmpty()) return@withContext Pair(true, "No hay telas para sincronizar.")
         val cleanUrl = config.url.trimEnd('/')
 
@@ -301,7 +301,7 @@ class SupabaseService(private val config: SupabaseConfig) {
     }
 
     suspend fun syncClientes(clientes: List<Cliente>): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        if (!refreshTokenIfNeeded()) return@withContext false to "Inicia sesión para sincronizar con Supabase."
+        if (!refreshTokenIfNeeded()) return@withContext false to "Inicia sesión para guardar los cambios."
         if (clientes.isEmpty()) return@withContext Pair(true, "No hay clientes para sincronizar.")
         val cleanUrl = config.url.trimEnd('/')
 

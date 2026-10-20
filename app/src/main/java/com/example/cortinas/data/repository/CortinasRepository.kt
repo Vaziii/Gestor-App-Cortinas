@@ -33,7 +33,7 @@ class CortinasRepository(context: Context) {
     val cotizaciones: StateFlow<List<Cotizacion>> = _cotizaciones.asStateFlow()
 
     /**
-     * Sincronización automática con Supabase en la nube.
+     * Sincronización automática con el servicio de datos en la nube.
      * Descarga el snapshot actual directamente a memoria.
      */
     suspend fun sincronizarConNube(): Pair<Boolean, String> = withContext(Dispatchers.IO) {
@@ -49,10 +49,10 @@ class CortinasRepository(context: Context) {
                 config.clearAuthorizationDenied()
                 true to "Datos actualizados automáticamente desde la nube."
             } else {
-                false to (errorMsg ?: "No se pudo conectar con Supabase. Se requiere conexión a internet.")
+                false to (errorMsg ?: "No se pudo conectar con el servicio en la nube. Revisa tu conexión a internet.")
             }
-        } catch (e: Exception) {
-            false to (e.localizedMessage ?: "Error de red al consultar la nube.")
+        } catch (_: Exception) {
+            false to "Error de conexión al consultar la información. Inténtalo de nuevo."
         }
     }
 
@@ -90,14 +90,17 @@ class CortinasRepository(context: Context) {
         ok
     }
 
-    suspend fun guardarCotizacion(cotizacion: Cotizacion): Cotizacion? = withContext(Dispatchers.IO) {
+    suspend fun guardarCotizacionConResultado(cotizacion: Cotizacion): Pair<Cotizacion?, String> = withContext(Dispatchers.IO) {
         val actualizada = cotizacion.copy(updatedAt = maxOf(System.currentTimeMillis(), cotizacion.updatedAt + 1))
-        val (guardada, _) = supabaseService.guardarCotizacion(actualizada)
+        val (guardada, mensaje) = supabaseService.guardarCotizacion(actualizada)
         if (guardada != null) {
             _cotizaciones.value = _cotizaciones.value.filter { it.id != guardada.id } + guardada
         }
-        guardada
+        guardada to mensaje
     }
+
+    suspend fun guardarCotizacion(cotizacion: Cotizacion): Cotizacion? =
+        guardarCotizacionConResultado(cotizacion).first
 
     suspend fun cambiarEstadoCotizacion(cotizacionId: String, nuevoEstado: EstadoCotizacion): Boolean = withContext(Dispatchers.IO) {
         val current = _cotizaciones.value.find { it.id == cotizacionId } ?: return@withContext false

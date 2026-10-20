@@ -29,6 +29,7 @@ data class AdicionalInput(val descripcion: String = "", val precio: String = "")
 
 @Composable
 fun MechanismControls(
+    esDosCuerpos: Boolean,
     mandoLado: String,
     onMandoLadoChange: (String) -> Unit,
     caida: String,
@@ -51,8 +52,8 @@ fun MechanismControls(
             fontWeight = FontWeight.Bold
         )
 
-        // 1. Selector de Lado de Mando (Cadena)
-        Row(
+        // En dos cuerpos se asume una cadena a cada lado.
+        if (!esDosCuerpos) Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -118,13 +119,13 @@ fun MechanismControls(
             }
         }
 
-        // 2. Selector de Caída: "Normal" o "Invertida"
+        // 2. Selector de Caída: "Normal" o "Rollo invertido"
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val isNormal = caida.equals("Normal", ignoreCase = true) || caida.contains("detrás", true)
-            val isInvertida = caida.equals("Invertida", ignoreCase = true) || caida.contains("delante", true)
+            val isNormal = caida.equals("Normal", ignoreCase = true) || caida.equals("Rollo normal", ignoreCase = true) || caida.contains("detrás", true)
+            val isInvertida = caida.equals("Invertida", ignoreCase = true) || caida.equals("Rollo invertido", ignoreCase = true) || caida.contains("delante", true)
 
             Surface(
                 shape = MaterialTheme.shapes.medium,
@@ -147,7 +148,7 @@ fun MechanismControls(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Caída Normal",
+                        "Rollo normal",
                         fontSize = 12.sp,
                         fontWeight = if (isNormal) FontWeight.Bold else FontWeight.Medium,
                         color = if (isNormal) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -176,7 +177,7 @@ fun MechanismControls(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Caída Invertida",
+                        "Rollo invertido",
                         fontSize = 12.sp,
                         fontWeight = if (isInvertida) FontWeight.Bold else FontWeight.Medium,
                         color = if (isInvertida) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -216,7 +217,7 @@ fun MechanismControls(
                         onCheckedChange = { checked ->
                             hasMotor = checked
                             if (!checked) onCostoMotorChange("")
-                            else if (costoMotor.isBlank()) onCostoMotorChange("180000")
+                            else if (costoMotor.isBlank()) onCostoMotorChange("220")
                         }
                     )
                 }
@@ -229,8 +230,8 @@ fun MechanismControls(
                     OutlinedTextField(
                         value = costoMotor,
                         onValueChange = onCostoMotorChange,
-                        label = { Text("Valor del Motor ($)") },
-                        placeholder = { Text("Ej: 180000") },
+                        label = { Text("Valor del Motor (USD)") },
+                        placeholder = { Text("Ej: 220") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .fillMaxWidth()

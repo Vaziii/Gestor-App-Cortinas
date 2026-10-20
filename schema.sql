@@ -22,6 +22,10 @@ alter table public.telas add column if not exists apto_impresion boolean;
 alter table public.telas add column if not exists apto_exterior boolean;
 alter table public.telas add column if not exists ancho_catalogo text not null default '';
 alter table public.telas add column if not exists catalogo_origen text not null default '';
+-- El catálogo de tejido tradicional no define precios por tela; se cotiza por categoría.
+update public.telas
+set precio_m2 = 0
+where catalogo_origen ilike '%tradicional%' and precio_m2 <> 0;
 alter table public.telas add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists public.clientes (
@@ -62,7 +66,7 @@ create table if not exists public.cotizacion_items (
     cotizacion_id text not null references public.cotizaciones(id) on delete cascade,
     ambiente text not null default 'Ventana',
     ancho numeric(10,3) not null default 1 check (ancho > 0),
-    alto numeric(10,3) not null default 1 check (alto > 0),
+    alto numeric(10,3) not null default 1 check (alto > 0 or (alto = 0 and tela_tipo = 'Cortina tradicional')),
     es_dos_cuerpos boolean not null default false,
     ancho_cuerpo_izq numeric(10,3) not null default 0 check (ancho_cuerpo_izq >= 0),
     ancho_cuerpo_der numeric(10,3) not null default 0 check (ancho_cuerpo_der >= 0),
@@ -78,6 +82,14 @@ create table if not exists public.cotizacion_items (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- Las cortinas tradicionales se cotizan por unidad/ancho y guardan alto = 0.
+-- Reemplaza también la validación en bases existentes que aún requieren alto > 0.
+alter table public.cotizacion_items
+    drop constraint if exists cotizacion_items_alto_check;
+alter table public.cotizacion_items
+    add constraint cotizacion_items_alto_check
+    check (alto > 0 or (alto = 0 and tela_tipo = 'Cortina tradicional'));
 
 create table if not exists public.abonos (
     id text primary key,
@@ -170,8 +182,14 @@ as $$
 declare
     v_codigo text := nullif(btrim(p_cotizacion->>'codigo'), '');
     v_siguiente bigint;
+    v_inicial_correo text;
     v_fila jsonb;
 begin
+    v_inicial_correo := upper(left(nullif(btrim(auth.jwt()->>'email'), ''), 1));
+    if v_inicial_correo is null or v_inicial_correo !~ '^[A-Z0-9]$' then
+        raise exception 'No se pudo obtener la inicial del correo de la sesión.';
+    end if;
+
     if v_codigo is null then
         select nullif(codigo, '')
         into v_codigo
@@ -186,11 +204,11 @@ begin
         from public.cotizaciones
         where id = p_cotizacion->>'id';
         if v_codigo is null then
-            select coalesce(max(substring(codigo from 5)::bigint), 0) + 1
+            select coalesce(max(substring(codigo from 5 for length(codigo) - 5)::bigint), 0) + 1
             into v_siguiente
             from public.cotizaciones
-            where codigo ~ '^COT-[0-9]+$';
-            v_codigo := 'COT-' || lpad(v_siguiente::text, 4, '0');
+            where codigo ~ '^COT-[0-9]+[A-Z0-9]$';
+            v_codigo := 'COT-' || lpad(v_siguiente::text, 4, '0') || v_inicial_correo;
         end if;
     end if;
 

@@ -204,6 +204,7 @@ fun TelaItemCard(
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
+    val esCatalogoTradicional = tela.catalogoOrigen.contains("tradicional", ignoreCase = true)
     ElevatedCard(
         shape     = MaterialTheme.shapes.large,
         modifier  = Modifier.fillMaxWidth(),
@@ -228,17 +229,19 @@ fun TelaItemCard(
                     )
                 }
 
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        "${FormatUtils.formatMoney(tela.precioM2)}/m²",
-                        style      = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color      = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier   = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
+                if (!esCatalogoTradicional) {
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            "${FormatUtils.formatMoney(tela.precioM2)}/m²",
+                            style      = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color      = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier   = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
 
@@ -290,12 +293,13 @@ fun TelaDialog(
     onDismiss: () -> Unit,
     onSave: (Tela) -> Unit
 ) {
-    var codigo by remember { mutableStateOf(telaInitial?.id ?: "") }
-    var modelo by remember { mutableStateOf(telaInitial?.modelo ?: "") }
+    var codigo by remember(telaInitial?.id) { mutableStateOf(telaInitial?.id ?: "") }
+    var modelo by remember(telaInitial?.id) { mutableStateOf(telaInitial?.modelo ?: "") }
     var tipo by remember { mutableStateOf(telaInitial?.tipo ?: "Translúcida") }
     var precioM2Str by remember { mutableStateOf(if (telaInitial != null && telaInitial.precioM2 > 0) telaInitial.precioM2.toLong().toString() else "") }
     var catalogoOrigen by remember { mutableStateOf(telaInitial?.catalogoOrigen ?: "") }
     var detalles by remember { mutableStateOf(telaInitial?.detalles ?: "") }
+    val esCatalogoTradicional = catalogoOrigen.contains("tradicional", ignoreCase = true)
 
     val tipos = listOf("Translúcida", "Blackout", "Screen / Malla Solar", "Zebra / Sheer", "Otra")
     var expandedTipo by remember { mutableStateOf(false) }
@@ -327,6 +331,17 @@ fun TelaDialog(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                OutlinedTextField(
+                    value = codigo,
+                    onValueChange = { codigo = it.trim() },
+                    label = { Text("Código de catálogo *") },
+                    placeholder = { Text("Ej: TD501, SC120, ZB031") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    singleLine = true,
+                    readOnly = telaInitial != null,
+                    isError = codigo.isBlank()
+                )
                 OutlinedTextField(
                     value = modelo,
                     onValueChange = { modelo = it },
@@ -373,16 +388,18 @@ fun TelaDialog(
                     shape = MaterialTheme.shapes.medium,
                     singleLine = true
                 )
-                OutlinedTextField(
-                    value = precioM2Str,
-                    onValueChange = { precioM2Str = it },
-                    label = { Text("Precio por m² *") },
-                    placeholder = { Text("Ej: 65000") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    singleLine = true
-                )
+                if (!esCatalogoTradicional) {
+                    OutlinedTextField(
+                        value = precioM2Str,
+                        onValueChange = { precioM2Str = it },
+                        label = { Text("Precio por m² *") },
+                        placeholder = { Text("Ej: 65000") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        singleLine = true
+                    )
+                }
                 OutlinedTextField(
                     value = detalles,
                     onValueChange = { detalles = it },
@@ -396,8 +413,8 @@ fun TelaDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (modelo.isNotBlank()) {
-                        val precio = precioM2Str.toDoubleOrNull() ?: 0.0
+                    if (codigo.isNotBlank() && modelo.isNotBlank()) {
+                        val precio = if (esCatalogoTradicional) 0.0 else precioM2Str.toDoubleOrNull() ?: 0.0
                         val nueva = telaInitial?.copy(
                             modelo = modelo,
                             tipo = tipo,
@@ -405,7 +422,7 @@ fun TelaDialog(
                             precioM2 = precio,
                             detalles = detalles
                         ) ?: Tela(
-                            id = codigo.trim().ifBlank { java.util.UUID.randomUUID().toString() },
+                            id = codigo.trim(),
                             modelo = modelo,
                             tipo = tipo,
                             catalogoOrigen = catalogoOrigen,
@@ -415,7 +432,7 @@ fun TelaDialog(
                         onSave(nueva)
                     }
                 },
-                enabled = modelo.isNotBlank(),
+                enabled = codigo.isNotBlank() && modelo.isNotBlank(),
                 shape = MaterialTheme.shapes.medium
             ) { Text("Guardar") }
         },

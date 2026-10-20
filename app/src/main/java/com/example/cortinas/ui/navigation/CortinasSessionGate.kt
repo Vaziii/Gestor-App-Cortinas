@@ -1,5 +1,6 @@
 package com.example.cortinas.ui.navigation
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,10 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -25,7 +22,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,11 +45,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.example.cortinas.data.repository.CortinasRepository
 import com.example.cortinas.ui.components.AdaptivePageFrame
+import com.example.cortinas.ui.theme.CortinasTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun CortinasSessionGate(repository: CortinasRepository) {
@@ -78,6 +78,8 @@ fun CortinasSessionGate(repository: CortinasRepository) {
     }
 
     LaunchedEffect(repository) {
+        try {
+        val completed = withTimeoutOrNull(30_000) {
         if (repository.config.isAuthenticated && repository.config.requiresFreshLogin) {
             repository.supabaseService.cerrarSesion()
             authenticated = false
@@ -95,7 +97,18 @@ fun CortinasSessionGate(repository: CortinasRepository) {
                 connectionMessage = "No se pudo validar el acceso. Inicia sesión de nuevo."
             }
         }
-        checkingSession = false
+        true
+        }
+        if (completed == null) {
+            cloudConnected = false
+            connectionMessage = "La conexión está tardando demasiado. Revisa tu internet e inténtalo de nuevo."
+        }
+        } catch (_: Exception) {
+            cloudConnected = false
+            connectionMessage = "No se pudo cargar la información. Revisa tu conexión e inténtalo de nuevo."
+        } finally {
+            checkingSession = false
+        }
     }
 
     LaunchedEffect(repository, authenticated, cloudConnected) {
@@ -152,7 +165,7 @@ fun CortinasSessionGate(repository: CortinasRepository) {
         )
         authenticated -> CloudConnectionScreen(
             message = if (authorizationDenied) {
-                "La contraseña es correcta, pero esta cuenta no está autorizada. En Supabase agrega el usuario a public.business_members con active = true para autorizar el acceso."
+                "Esta cuenta todavía no tiene permiso para ingresar. Contacta al administrador del negocio para habilitar el acceso."
             } else connectionMessage,
             busy    = checkingSession,
             onRetry = {
@@ -193,18 +206,12 @@ private fun CloudConnectionScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Surface(
-                    shape    = MaterialTheme.shapes.extraLarge,
-                    color    = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.size(80.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.WifiOff,
-                        contentDescription = null,
-                        tint     = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(20.dp)
-                    )
-                }
+                Image(
+                    painter = painterResource(id = com.example.cortinas.R.drawable.logo),
+                    contentDescription = "Logo DecorNayeli",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(240.dp).height(156.dp)
+                )
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "Cuenta iniciada",
@@ -224,7 +231,7 @@ private fun CloudConnectionScreen(
                     modifier  = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text     = message.ifBlank { "No se pudo actualizar Supabase. Revisa la conexión e inténtalo de nuevo." },
+                        text     = message.ifBlank { "No se pudo actualizar. Revisa la conexión e inténtalo de nuevo." },
                         modifier = Modifier.padding(16.dp),
                         style    = MaterialTheme.typography.bodyMedium,
                         color    = MaterialTheme.colorScheme.onSurface,
@@ -279,18 +286,12 @@ private fun BusinessLoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Logo / Ícono expresivo
-                Surface(
-                    shape    = MaterialTheme.shapes.extraLarge,
-                    color    = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(84.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Lock,
-                        contentDescription = null,
-                        tint     = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(22.dp)
-                    )
-                }
+                Image(
+                    painter = painterResource(id = com.example.cortinas.R.drawable.logo),
+                    contentDescription = "Logo DecorNayeli",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(240.dp).height(156.dp)
+                )
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "Iniciar sesión",
@@ -392,5 +393,90 @@ private fun BusinessLoginScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(name = "Acceso - Inicio de sesión", showBackground = true, showSystemUi = true)
+@Composable
+private fun BusinessLoginScreenPreview() {
+    CortinasTheme {
+        BusinessLoginScreen(
+            repository = CortinasRepository(LocalContext.current),
+            initialMessage = "",
+            onSignedIn = {}
+        )
+    }
+}
+
+@Preview(
+    name = "Acceso - Modo oscuro",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+    showSystemUi = true
+)
+@Composable
+private fun BusinessLoginDarkPreview() {
+    CortinasTheme(darkTheme = true) {
+        BusinessLoginScreen(
+            repository = CortinasRepository(LocalContext.current),
+            initialMessage = "",
+            onSignedIn = {}
+        )
+    }
+}
+
+@Preview(name = "Acceso - Error de inicio", showBackground = true, showSystemUi = true)
+@Composable
+private fun BusinessLoginErrorPreview() {
+    CortinasTheme {
+        BusinessLoginScreen(
+            repository = CortinasRepository(LocalContext.current),
+            initialMessage = "No se pudo iniciar sesión. Verifica tu correo y contraseña.",
+            onSignedIn = {}
+        )
+    }
+}
+
+@Preview(name = "Nube - Sin conexión", showBackground = true, showSystemUi = true)
+@Composable
+private fun CloudConnectionScreenPreview() {
+    CortinasTheme {
+        CloudConnectionScreen(
+            message = "No se pudo conectar con el servicio en la nube. Revisa tu conexión a internet.",
+            busy = false,
+            onRetry = {},
+            onSignOut = {}
+        )
+    }
+}
+
+@Preview(name = "Nube - Reintentando conexión", showBackground = true, showSystemUi = true)
+@Composable
+private fun CloudConnectionBusyPreview() {
+    CortinasTheme {
+        CloudConnectionScreen(
+            message = "Actualizando información desde la nube…",
+            busy = true,
+            onRetry = {},
+            onSignOut = {}
+        )
+    }
+}
+
+@Preview(
+    name = "Nube - Modo oscuro",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+    showSystemUi = true
+)
+@Composable
+private fun CloudConnectionDarkPreview() {
+    CortinasTheme(darkTheme = true) {
+        CloudConnectionScreen(
+            message = "No se pudo conectar con el servicio en la nube. Revisa tu conexión a internet.",
+            busy = false,
+            onRetry = {},
+            onSignOut = {}
+        )
     }
 }

@@ -53,6 +53,9 @@ fun parseMetros(input: String): Double {
 @Composable
 fun CotizadorScreen(
     repository: CortinasRepository,
+    integrated: Boolean = false,
+    onAddToProject: (CotizacionItem) -> Unit = {},
+    onAdded: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val telas by repository.telas.collectAsState()
@@ -63,6 +66,9 @@ fun CotizadorScreen(
         clientes = clientes,
         nombreNegocio = repository.config.nombreNegocio,
         onGuardarCotizacion = { cot -> repository.guardarCotizacion(cot) },
+        integrated = integrated,
+        onAddToProject = onAddToProject,
+        onAdded = onAdded,
         modifier = modifier
     )
 }
@@ -72,8 +78,11 @@ fun CotizadorScreen(
 fun CotizadorContent(
     telas: List<Tela>,
     clientes: List<Cliente>,
-    nombreNegocio: String = "Cortinas & Estilo",
+    nombreNegocio: String = "DECOR NAYELI CORTINAS Y LENCERIA",
     onGuardarCotizacion: suspend (Cotizacion) -> Cotizacion? = { it },
+    integrated: Boolean = false,
+    onAddToProject: (CotizacionItem) -> Unit = {},
+    onAdded: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -207,6 +216,7 @@ fun CotizadorContent(
 
     Scaffold(
         floatingActionButton = {
+          if (!integrated) {
             SmallFloatingActionButton(onClick = {
                     itemsCotizacion.clear()
                     clienteNombre = ""
@@ -231,8 +241,10 @@ fun CotizadorContent(
                 }) {
                 Icon(Icons.Default.RestartAlt, contentDescription = "Reiniciar")
             }
+          }
         },
         bottomBar = {
+          if (!integrated) {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 tonalElevation = 3.dp,
@@ -345,6 +357,7 @@ fun CotizadorContent(
                     }
                 }
             }
+          }
         },
         modifier = modifier
     ) { padding ->
@@ -355,7 +368,7 @@ fun CotizadorContent(
             contentPadding = PaddingValues(bottom = 110.dp)
         ) {
             // 1. TARJETA MODERNA DEL CLIENTE
-            item {
+            if (!integrated) item {
                 ElevatedCard(
                     shape = MaterialTheme.shapes.large,
                     elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
@@ -691,6 +704,7 @@ fun CotizadorContent(
             // 5. MECANISMOS Y EXTRAS (CAÍDA NORMAL O INVERTIDA)
             item {
                 MechanismControls(
+                    esDosCuerpos = esDosCuerpos,
                     mandoLado = mandoLado,
                     onMandoLadoChange = { mandoLado = it },
                     caida = caida,
@@ -751,7 +765,13 @@ fun CotizadorContent(
                                             else "Adicional: ${adicional.descripcion.ifBlank { "Sin descripción" }} -- ${FormatUtils.formatMoney(precio)}"
                                         }.joinToString("\n")
                                     )
-                                    itemsCotizacion.add(nuevoItem)
+                                    if (integrated) {
+                                        onAddToProject(nuevoItem)
+                                        Toast.makeText(context, "Cortina agregada al proyecto", Toast.LENGTH_SHORT).show()
+                                        onAdded()
+                                    } else {
+                                        itemsCotizacion.add(nuevoItem)
+                                    }
                                     // Preparar siguiente ventana
                                     ambiente = "Ventana ${itemsCotizacion.size + 1}"
                                     costoMotorStr = ""
