@@ -18,6 +18,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Build de pruebas aislado: puede instalarse junto a producción y no autoactualizarse.
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+            buildConfigField("boolean", "ENABLE_APP_UPDATES", "false")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -32,6 +38,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
