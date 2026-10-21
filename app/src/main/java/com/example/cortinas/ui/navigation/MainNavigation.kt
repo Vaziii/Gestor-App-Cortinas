@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
@@ -130,7 +131,10 @@ fun MainNavigation(
             )
             IconButton(
                 onClick = { scope.launch { drawerState.open() } },
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 28.dp)
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 8.dp, top = 12.dp)
             ) {
                 Icon(Icons.Default.Menu, contentDescription = "Abrir menú")
             }

@@ -84,6 +84,7 @@ class  MainActivity : ComponentActivity() {
     }
 
     private fun checkForUpdate() {
+        if (!BuildConfig.ENABLE_APP_UPDATES) return
         Thread {
             try {
                 val update = updateService.checkForUpdate()
